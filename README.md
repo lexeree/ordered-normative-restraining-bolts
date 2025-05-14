@@ -29,6 +29,6 @@ The trajectory will be saved in a timestamped .csv files.
 
 #### Warning
 
-Take caution when running ``compute_w_dilemma.py``. The fact that more actions are available to the agent in this case study due to removed restrictions on the environment means that CHVI becomes very computationally expensive. It requires >100 GB RAM, and will take more than 8 hours. However, for every iteration of the CHVI algorithm, the hull of the initial state is printed in the console, so you can still watch how the hull evolves for a number of iterations.
+Take caution when running ``compute_w_dilemma.py``. The fact that more actions are available to the agent in this case study due to removed restrictions on the environment means that CHVI becomes very computationally expensive. It requires >100 GB RAM, and will take 2-3. However, for every iteration of the CHVI algorithm, the hull of the initial state is printed in the console, so you can still watch how the hull evolves for a number of iterations.
 
 
