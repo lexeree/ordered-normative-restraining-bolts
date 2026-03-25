@@ -2,7 +2,7 @@ import csv
 import datetime
 
 class Log:
-    def __init__(self, agent, map):
+    def __init__(self, agent, map=None):
         self.agent = agent
         self.map = map
         self.trace = []
@@ -10,6 +10,23 @@ class Log:
 
     def export_trace(self):
         header = ['X', 'Y', 'Action', 'Inventory', 'Damage', 'Attacked?', 'Choices']
+        with open(self.agent +
+                  str(datetime.datetime.now().year) +
+                  str(datetime.datetime.now().month) +
+                  str(datetime.datetime.now().day) +
+                  "_" +
+                  str(datetime.datetime.now().hour) +
+                  str(datetime.datetime.now().minute) +
+                  str(datetime.datetime.now().second) +
+                  '_log.csv', 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=header)
+            writer.writeheader()
+            for tr in self.trace:
+                writer.writerow(tr)
+
+
+    def export_trace_g(self):
+        header = ['X', 'Y', 'Action', 'Inventory (wood)', 'Inventory (ore)', 'Sunset?']
         with open(self.agent +
                   str(datetime.datetime.now().year) +
                   str(datetime.datetime.now().month) +
@@ -33,6 +50,16 @@ class Log:
         tr['Damage'] = str(state.damage)
         tr['Attacked?'] = str(state.attack)
         tr['Choices'] = possible
+        self.trace.append(tr)
+
+    def record_state_g(self, state, action):
+        tr = {}
+        tr['X'] = state[0]
+        tr['Y'] = state[1]
+        tr['Action'] = action
+        tr['Inventory (wood)'] = state[3]
+        tr['Inventory (ore)'] = state[4]
+        tr['Sunset?'] = state[6]
         self.trace.append(tr)
 
     def export_summary(self):
