@@ -2,7 +2,7 @@
 
 class DFA:
     def __init__(self, alphabet, reward=0.0, reset="punctual", permission=False):
-        self.alphabet = alphabet.labels
+        self.alphabet = alphabet['labels']
         self.state0 = 0
         self.reward = reward
         self.states = []

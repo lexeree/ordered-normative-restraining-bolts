@@ -19,6 +19,15 @@ directions = {
 }
 
 
+def decode_action(i):
+    return actions[i]
+
+
+def decode_state(state):
+    return (f'State(x={state[0]}, y={state[1]}, label={labels[state[2]]}, #coll_wood={state[3]}, #coll_ore={state[4]}, '
+            f'sunset_counter={state[5]}, last_action={ None if state[6] == len(actions) else actions[state[6]]})')
+
+
 class MerchantEnv(Env):
     def __init__(self, layout="basic", risk_fight=1.0, risk_death=0.0, capacity=5, sunset=28):
         # set environment parameters
@@ -49,18 +58,38 @@ class MerchantEnv(Env):
             + (gym.spaces.Discrete(2),) * len(self.ore_positions)
         )
 
-    def reset(self, seed=None, *args, **kwargs):
-        super().reset(*args, **kwargs)
-        self.pos = self.home
-        self.label = "H"
-        self.carried_wood, self.carried_ore = 0, 0
-        self.wood = [1 for _ in self.wood_positions]
-        self.ore = [1 for _ in self.ore_positions]
-        self.clock = 0  # clock counts up from 0 until sundown, time then stops being tracked
-        self.action = None
+    def reset(self, *, seed=None, options=None):
+        super().reset(seed=seed)
+
+        if options is not None and "state" in options:
+            state = options["state"]
+            self.pos = (state[0], state[1])
+            self.label = labels[state[2]]
+            self.carried_wood = state[3]
+            self.carried_ore = state[4]
+            self.clock = state[5]
+            if state[6] == len(actions):
+                self.action = None
+            else:
+                self.action = actions[state[6]]
+            if len(state) <= 7:
+                self.wood = []
+                self.ore = []
+            else:
+                self.wood = list(state[7:(7+ len(self.wood_positions))])
+                self.ore = list(state[7+ len(self.wood_positions): 7+ len(self.wood_positions) + len(self.ore_positions)])
+        else:
+            self.pos = self.home
+            self.label = "H"
+            self.carried_wood, self.carried_ore = 0, 0
+            self.wood = [1 for _ in self.wood_positions]
+            self.ore = [1 for _ in self.ore_positions]
+            self.clock = 0  # clock counts up from 0 until sundown, time then stops being tracked
+            self.action = None
         if seed is not None:
             random.seed(seed)
         return self.get_state(), {}
+
 
     def __obs(self):
         return (
