@@ -17,7 +17,7 @@ def create_state_dict(env, automata, dist):
 
     # create extended state
     for i in range(0, len(automata)):
-        initial_state = initial_state + (0,)
+        initial_state = initial_state + (automata[i].state0,)
 
     dict_list.append((initial_state, []))
     add_next_state(initial_state, env, ag, automata, dict_list, 0, False, pbar)
@@ -48,11 +48,12 @@ def add_next_state(state, env, agent, automata, dict_list, depth, is_terminal, p
         next_state, _, terminal, _, _ = env_new.step(action)
 
         trans = tuple()
+
         for i in range(len(automata)):
             astate = state[i + 1]
             if astate in automata[i].final:
                 astate = automata[i].state0
-            nst = automata[i].transition(astate, inpt)
+            nst = automata[i].transition(inpt, astate)
             trans = trans + (nst,)
 
         nstate = (next_state,) + trans
@@ -117,9 +118,9 @@ def Q_function_calculator(env, state, V_state_dict, automata, dist=False, discou
 
         for i in range(len(automata)):
             if astates[i] in automata[i].final:
-                curr_astates = curr_astates + (automata[i].transition(automata[i].state0, curr_inpt),)
+                curr_astates = curr_astates + (automata[i].transition(curr_inpt, automata[i].state0),)
             else:
-                curr_astates = curr_astates + (automata[i].transition(astates[i], curr_inpt),)
+                curr_astates = curr_astates + (automata[i].transition(curr_inpt, astates[i]),)
 
         for i in range(len(automata)):
             if curr_astates[i] in automata[i].final:
@@ -165,7 +166,7 @@ if __name__ == '__main__':
     transa[0] = trans0a
     transa[1] = trans1a
     automatona = DangerDFA(dict(labels=['atDanger']), 1)
-    hull = convex_hull_value_iteration(env, [automatona], False, 0.99, 25)
+    hull = convex_hull_value_iteration(env, [automatona], False, 1, 25)
 
     for k in hull.keys():
         if k[0][6] == 7:
