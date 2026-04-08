@@ -26,7 +26,7 @@ class Log:
 
 
     def export_trace_g(self):
-        header = ['X', 'Y', 'Action', 'Inventory (wood)', 'Inventory (ore)', 'Sunset?']
+        header = ['X', 'Y', 'QVals', 'Action', 'Inventory (wood)', 'Inventory (ore)', 'Sunset?']
         with open(self.agent +
                   str(datetime.datetime.now().year) +
                   str(datetime.datetime.now().month) +
@@ -52,14 +52,15 @@ class Log:
         tr['Choices'] = possible
         self.trace.append(tr)
 
-    def record_state_g(self, state, action):
+    def record_state_g(self, state, action, qs):
         tr = {}
         tr['X'] = state[0]
         tr['Y'] = state[1]
+        tr['QVals'] = qs
         tr['Action'] = action
         tr['Inventory (wood)'] = state[3]
         tr['Inventory (ore)'] = state[4]
-        tr['Sunset?'] = state[6]
+        tr['Sunset?'] = state[5]
         self.trace.append(tr)
 
     def export_summary(self):

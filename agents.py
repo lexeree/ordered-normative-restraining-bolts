@@ -5,7 +5,7 @@ from gymnasium.wrappers import TimeLimit
 import numpy as np
 import pickle
 import log
-from wrappers import SimpleMerchantRBWrapper
+from wrappers import SimpleMerchantRBWrapper, MOMerchantRBWrapper
 
 
 obj_map = {
@@ -136,8 +136,8 @@ class RandomAgent(Agent):
     
 
 class QLearner():
-    def __init__(self, env, eval_env=None, ntrain=10000, gamma=0.99, alpha=0.2, epsilon=0.15):
-        self.env = TimeLimit(env, 50)
+    def __init__(self, env, eval_env=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
+        self.env = TimeLimit(env, 35)
         self.eval_env = eval_env
         self.ntrain = ntrain
         self.gamma = gamma
@@ -148,13 +148,19 @@ class QLearner():
 
 
     def update(self, state, action, nextState, reward, terminated):
-        #print("qvals", self.qvalues[state][action])
         future_q_value = (not terminated) * np.max(self.qvalues[nextState])
-        #print("future q", future_q_value)
         temporal_difference = reward + self.gamma * future_q_value - self.qvalues[state][action]
-        #print("TD", temporal_difference)
-        self.qvalues[state][action] = self.qvalues[state][action] + self.alpha * temporal_difference
-        #print("qvals now", self.qvalues[state][action])
+        self.qvalues[state][action] += self.alpha * temporal_difference
+
+    def policy(self, state, egreedy=False):
+        acts = self.env.unwrapped.exclActions()
+        if egreedy and random.random() < self.epsilon:
+            action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
+        else:
+            opts = self.qvalues[state]
+            filtered = np.array([-1*np.inf if a in acts else opts[a] for a in range(self.env.action_space.n)])
+            action = int(np.argmax(filtered))
+        return action
 
     def train(self, save=None):
         fname = save if not None else 'qvals'
@@ -162,13 +168,7 @@ class QLearner():
             observation, info = self.env.reset()
             episode_over = False
             while not episode_over:
-                acts = self.env.unwrapped.exclActions()
-                if random.random() < self.epsilon:
-                    action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
-                else:
-                    opts = self.qvalues[observation]
-                    filtered = np.array([-1*np.inf if a in acts else opts[a] for a in range(self.env.action_space.n)])
-                    action = int(np.argmax(filtered))
+                action = self.policy(observation, egreedy=True)
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
                 self.update(observation, action, next_observation, reward, terminated)
                 episode_over = terminated or truncated
@@ -181,21 +181,14 @@ class QLearner():
                 qvals = dict(self.qvalues.copy())
                 pickle.dump(qvals, f)   
 
-    def evaluate(self, runs=1, load_model=None, record=True):
+    def evaluate(self, runs=1, record=True):
         evaluation = []
-        if load_model is None:
-            qvalues = self.qvalues
-        else:
-            qvalues = load_model
         for i in range(runs):
             observation, info = self.env.reset()
             episode_over = False
             while not episode_over:
-                acts = self.env.unwrapped.exclActions()
-                opts = self.qvalues[observation]
-                filtered = np.array([-1*np.inf if a in acts else opts[a] for a in range(self.env.action_space.n)])
-                action = int(np.argmax(filtered))
-                self.logger.record_state_g(observation, action)
+                action = self.policy(observation)
+                self.logger.record_state_g(observation, action, self.qvalues[observation])
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
                 episode_over = terminated or truncated
                 observation = next_observation
@@ -206,11 +199,11 @@ class QLearner():
         self.env.close()
         return evaluation
     
-#TODO: NEED TO INCLUDE ASTATES IN QVALUE TABLES/OBSERVATIONS
+
 class RBAgent(QLearner):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
         QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = SimpleMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
+        self.env = TimeLimit(SimpleMerchantRBWrapper(env, dfa_list), 35)
         self.name = 'Restraining Bolt Agent'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -222,12 +215,15 @@ class RBAgent(QLearner):
             observation, info = self.env.reset()
             episode_over = False
             while not episode_over:
-                if random.random() < self.epsilon:
-                    action = self.env.unwrapped.action_space.sample()
-                else:
-                    action = int(np.argmax(self.qvalues[observation]))
+                total_obs = (observation, )
+                for dfa in self.dfas:
+                    total_obs = total_obs + (dfa.state, )
+                action = self.policy(total_obs, egreedy=True)
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
-                self.update(observation, action, next_observation, reward, terminated)
+                n_total_obs = (next_observation, )
+                for dfa in self.dfas:
+                    n_total_obs = n_total_obs + (dfa.state, )
+                self.update(total_obs, action, n_total_obs, reward, terminated)
                 episode_over = terminated or truncated
                 observation = next_observation
             i += 1
@@ -236,20 +232,19 @@ class RBAgent(QLearner):
         if save is not None:
             with open(fname+'.p', 'bw') as f:
                 qvals = dict(self.qvalues.copy())
-                pickle.dump(qvals, f)    
+                pickle.dump(qvals, f)      
 
-    def evaluate(self, runs=1, load_model=None, record=True):
+    def evaluate(self, runs=1, record=True):
         evaluation = []
-        if load_model is None:
-            qvalues = self.qvalues
-        else:
-            qvalues = load_model
         for i in range(runs):
             observation, info = self.env.reset()
             episode_over = False
             while not episode_over:
-                action = int(np.argmax(qvalues[observation]))
-                self.logger.record_state_g(observation, action)
+                total_obs = (observation, )
+                for dfa in self.dfas:
+                    total_obs = total_obs + (dfa.state, )
+                action = self.policy(total_obs)
+                self.logger.record_state_g(observation, action, self.qvalues[total_obs])
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
                 episode_over = terminated or truncated
                 observation = next_observation
@@ -264,67 +259,164 @@ class RBAgent(QLearner):
 class ONRBAgent1(QLearner):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
         QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = SimpleMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
+        self.env = MOMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
         self.name = 'ONRB Agent (scalarization)'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
         self.dfas = dfa_list if not None else []
         self.allQValues = [self.qvalues]
         self.weights = [1]
-        for a in self.automata:
+        for a in self.dfas:
             aqvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
             self.allQValues.append(aqvalues)
             self.weights.append(a.reward)
 
-    def getQVec(self, state, action, aStates):
+    def getQValueVector(self, state, action):
         vec = []
-        ast = ','.join(str(i) for i in aStates)
         for q in self.allQValues:
-            vec.append(q[(ast, state, action)])
-        return vec
+            vec.append(q[state][action])
+        return np.array(vec)
 
-    def train(self, save=None):
-        fname = save if not None else 'qvals'
-        for i in range(self.ntrain):
-            observation, info = self.env.reset()
-            episode_over = False
-            while not episode_over:
-                if random.random() < self.epsilon:
-                    action = self.env.unwrapped.action_space.sample()
-                else:
-                    action = int(np.argmax(self.qvalues[observation]))
-                next_observation, reward, terminated, truncated, info = self.env.step(action)
-                self.update(observation, action, next_observation, reward, terminated)
-                episode_over = terminated or truncated
-                observation = next_observation
-            i += 1
-            if i % 1000 == 0:
-                print(i, "episodes complete") 
-        if save is not None:
-            with open(fname+'.p', 'bw') as f:
-                qvals = dict(self.qvalues.copy())
-                pickle.dump(qvals, f)    
-
-    def evaluate(self, runs=1, load_model=None, record=True):
-        evaluation = []
-        if load_model is None:
-            qvalues = self.qvalues
-        else:
-            qvalues = load_model
-        for i in range(runs):
-            observation, info = self.env.reset()
-            episode_over = False
-            while not episode_over:
-                action = int(np.argmax(qvalues[observation]))
-                self.logger.record_state_g(observation, action)
-                next_observation, reward, terminated, truncated, info = self.env.step(action)
-                episode_over = terminated or truncated
-                observation = next_observation
-                if episode_over and record:
-                    self.logger.export_trace_g()
-            i += 1
-            print(i, " episodes complete")
-        self.env.close()
-        return evaluation
+    def computeValueVector(self, state):
+        excls = self.env.unwrapped.exclActions()
+        possible = [a for a in range(self.env.action_space.n) if a not in excls]
+        vals = [float('-inf')]*len(self.allQValues)
+        for a in possible:
+            qs = self.getQValueVector(state, a)
+            for i in range(len(vals)):
+                if qs[i] > vals[i]:
+                    vals[i] = qs[i]
+        return np.array(vals)
     
+    def update(self, state, action, nextState, reward, terminated):
+        future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
+        temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
+        for i in range(len(self.allQValues)):
+            self.allQValues[i][state][action] += self.alpha * temporal_difference[i]
 
+    def policy(self, state, egreedy=False):
+        acts = self.env.unwrapped.exclActions()
+        if egreedy and random.random() < self.epsilon:
+            action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
+        else:
+            excls = self.env.unwrapped.exclActions()
+            values = []
+            for a in range(self.env.action_space.n):
+                qvec = self.getQValueVector(state, a)
+                total = 0
+                for i in range(len(self.allQValues)):
+                    total += qvec[i]*self.weights[i]
+                    values.append(total)
+            filtered = np.array([-1*np.inf if a in excls else values[a] for a in range(self.env.action_space.n)])
+            action = int(np.argmax(filtered))
+        return action
+     
+
+class ONRBAgent1(QLearner):
+    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
+        QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
+        self.env = MOMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
+        self.name = 'ONRB Agent (scalarization)'
+        self.logger = log.Log(self.name)
+        self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
+        self.dfas = dfa_list if not None else []
+        self.allQValues = []
+        self.weights = [1]
+        for a in self.dfas:
+            aqvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
+            self.allQValues.append(aqvalues)
+            self.weights.append(a.reward)
+        self.allQValues += [self.qvalues]
+
+    def getQValueVector(self, state, action):
+        vec = []
+        for q in self.allQValues:
+            vec.append(q[state][action])
+        return np.array(vec)
+
+    def computeValueVector(self, state):
+        excls = self.env.unwrapped.exclActions()
+        possible = [a for a in range(self.env.action_space.n) if a not in excls]
+        vals = [float('-inf')]*len(self.allQValues)
+        for a in possible:
+            qs = self.getQValueVector(state, a)
+            for i in range(len(vals)):
+                if qs[i] > vals[i]:
+                    vals[i] = qs[i]
+        return np.array(vals)
+    
+    def update(self, state, action, nextState, reward, terminated):
+        future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
+        temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
+        for i in range(len(self.allQValues)):
+            self.allQValues[i][state][action] += self.alpha * temporal_difference[i]
+
+    def policy(self, state, egreedy=False):
+        if egreedy and random.random() < self.epsilon:
+            action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
+        else:
+            excls = self.env.unwrapped.exclActions()
+            values = []
+            for a in range(self.env.action_space.n):
+                qvec = self.getQValueVector(state, a)
+                total = 0
+                for i in range(len(self.allQValues)):
+                    total += qvec[i]*self.weights[i]
+                    values.append(total)
+            filtered = np.array([-1*np.inf if a in excls else values[a] for a in range(self.env.action_space.n)])
+            action = int(np.argmax(filtered))
+        return action
+
+
+class ONRBAgent2(QLearner):
+    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
+        QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
+        self.env = MOMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
+        self.name = 'ONRB Agent (TLQL)'
+        self.logger = log.Log(self.name)
+        self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
+        self.dfas = dfa_list if not None else []
+        self.allQValues = []
+        for a in self.dfas:
+            aqvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
+            self.allQValues.append(aqvalues)
+        self.allQValues += [self.qvalues]
+
+    def getQValueVector(self, state, action):
+        vec = []
+        for q in self.allQValues:
+            vec.append(q[state][action])
+        return np.array(vec)
+
+    def computeValueVector(self, state):
+        excls = self.env.unwrapped.exclActions()
+        possible = [a for a in range(self.env.action_space.n) if a not in excls]
+        vals = [float('-inf')]*len(self.allQValues)
+        for a in possible:
+            qs = self.getQValueVector(state, a)
+            for i in range(len(vals)):
+                if qs[i] > vals[i]:
+                    vals[i] = qs[i]
+        return np.array(vals)
+    
+    def update(self, state, action, nextState, reward, terminated):
+        future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
+        temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
+        for i in range(len(self.allQValues)):
+            self.allQValues[i][state][action] += self.alpha * temporal_difference[i]
+
+    def policy(self, state, egreedy=False):
+        acts = self.env.unwrapped.exclActions()
+        if egreedy and random.random() < self.epsilon:
+            action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
+        else:
+            excls = self.env.unwrapped.exclActions()
+            possible = [a for a in range(self.env.action_space.n) if a not in excls]
+            vvec = self.computeValueVector(state)
+            for i in len(vvec):
+                newpos = []
+                for a in possible:
+                    if self.allQValues[i][state][a] >= vvec[i]:
+                        newpos.append(a)
+                possible = newpos
+        return random.choice(possible)

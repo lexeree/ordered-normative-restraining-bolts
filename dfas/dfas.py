@@ -1,8 +1,7 @@
 
 
 class DFA:
-    def __init__(self, alphabet, reward=0.0, reset="punctual", permission=False):
-        self.alphabet = alphabet.labels
+    def __init__(self, reward=0.0, reset="punctual", permission=False):
         self.state0 = 0
         self.reward = reward
         self.states = []
@@ -27,8 +26,8 @@ class DFA:
 
 
 class DangerDFA(DFA):
-    def __init__(self, alphabet, reward=0):
-        super().__init__(alphabet, -reward, reset="punctual", permission=False)
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="punctual", permission=False)
         self.states = [0, 1]
         self.final = [1]
 
@@ -45,8 +44,8 @@ class DangerDFA(DFA):
 
 
 class PassiveDFA(DFA):
-    def __init__(self, alphabet, reward=0):
-        super().__init__(alphabet, -reward, reset="punctual", permission=False)
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="punctual", permission=False)
         self.states = [0, 1]
         self.final = [1]
 
@@ -63,8 +62,8 @@ class PassiveDFA(DFA):
 
 
 class EnvFriendlyDFA(DFA):
-    def __init__(self, alphabet, reward=0):
-        super().__init__(alphabet, -reward, reset="punctual", permission=False)
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="punctual", permission=False)
         self.states = [0, 1]
         self.final = [1]
 
@@ -83,8 +82,8 @@ class EnvFriendlyDFA(DFA):
 # O^A_sundown(atMarket | atHome)
 # F(atHome & !atMarket U sundown)
 class DeliveryDFA(DFA):
-    def __init__(self, alphabet, reward=0):
-        super().__init__(alphabet, -reward, reset="achievement", permission=False)
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="achievement", permission=False)
         self.states = [0, 1, 2]
         self.final = [2]
 
@@ -111,8 +110,8 @@ class DeliveryDFA(DFA):
 
 # TODO: permission DFAs
 class EnvPerm(DFA):
-    def __init__(self, alphabet, reward=0):
-        super().__init__(alphabet, reward, reset="punctual", permission=True)
+    def __init__(self, reward=0):
+        super().__init__(reward, reset="punctual", permission=True)
         self.states = [0, 1]
         self.final = [1]
 
