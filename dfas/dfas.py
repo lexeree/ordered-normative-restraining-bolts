@@ -53,7 +53,7 @@ class PassiveDFA(DFA):
         if state is None:
             state = self.state
         if state == 0:
-            if "Fight" in inpt:
+            if "atDanger" in inpt and "unload" not in inpt:
                 return 1
             else:
                 return 0
@@ -71,7 +71,7 @@ class EnvFriendlyDFA(DFA):
         if state is None:
             state = self.state
         if state == 0:
-            if "atTree" in inpt and "Extract" in inpt:
+            if "atTree" in inpt and "extract" in inpt:
                 return 1
             else:
                 return 0

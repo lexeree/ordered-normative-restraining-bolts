@@ -15,17 +15,17 @@ class SimpleMerchantRBWrapper(Wrapper):
         return obs, info
 
     def step(self, action):
-        inpt = self.env.get_labels()
+        inpt = self.env.unwrapped.get_labels()
         observation, reward, terminated, truncated, info = self.env.step(action)
         rb = []
         for dfa in self.dfa_list:
             state = dfa.transition(inpt)
             if state in dfa.final:
                 rb.append(dfa.reward)
+                dfa.state = dfa.reset(dfa.state, state)
             else:
                 dfa.state = state
                 rb.append(0.0)
-            dfa.state = dfa.reset(dfa.state, state)
         for r in rb:
             reward += r
         return observation, reward, terminated, truncated, info

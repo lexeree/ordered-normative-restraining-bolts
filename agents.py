@@ -148,9 +148,12 @@ class QLearner():
 
 
     def update(self, state, action, nextState, reward, terminated):
-        future_q_value = (not terminated) * np.max(self.qvalues[nextState])
+        future_q_value = np.max(self.qvalues[nextState]) if not terminated else 0.0
+        print("Future q val: ", future_q_value)
         temporal_difference = reward + self.gamma * future_q_value - self.qvalues[state][action]
-        self.qvalues[state][action] += self.alpha * temporal_difference
+        print("Temporal difference: ", temporal_difference)
+        self.qvalues[state][action] = self.qvalues[state][action] + self.alpha * temporal_difference
+        print("New q val ", state, ", ", action, ": ", self.qvalues[state][action])
 
     def policy(self, state, egreedy=False):
         acts = self.env.unwrapped.exclActions()
@@ -203,7 +206,7 @@ class QLearner():
 class RBAgent(QLearner):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
         QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = TimeLimit(SimpleMerchantRBWrapper(env, dfa_list), 35)
+        self.env = SimpleMerchantRBWrapper(TimeLimit(env, 50), dfa_list) 
         self.name = 'Restraining Bolt Agent'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -218,8 +221,12 @@ class RBAgent(QLearner):
                 total_obs = (observation, )
                 for dfa in self.dfas:
                     total_obs = total_obs + (dfa.state, )
+                #print("Observation: ", total_obs)
                 action = self.policy(total_obs, egreedy=True)
+                #print("Delivery: ", self.dfas[0].state)
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
+                #if reward != 0:
+                #    print("reward: ", reward)
                 n_total_obs = (next_observation, )
                 for dfa in self.dfas:
                     n_total_obs = n_total_obs + (dfa.state, )

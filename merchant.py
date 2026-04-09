@@ -20,7 +20,7 @@ directions = {
 
 
 class MerchantEnv(Env):
-    def __init__(self, layout="basic", risk_fight=1.0, risk_death=0.0, capacity=5, sunset=28):
+    def __init__(self, layout="basic", risk_fight=1.0, risk_death=0.0, capacity=5, sunset=32):
         # set environment parameters
         self.layout = layout
         self.risk_fight = risk_fight
