@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 import log
 from wrappers import SimpleMerchantRBWrapper, MOMerchantRBWrapper
-
+from merchant import actions
 
 obj_map = {
     'T': 'tree',
@@ -227,8 +227,12 @@ class RBAgent(QLearner):
                 for dfa in self.dfas:
                     n_total_obs = n_total_obs + (dfa.state, )
                 self.update(total_obs, action, n_total_obs, reward, terminated)
+                #print(total_obs)
                 episode_over = terminated or truncated
                 observation = next_observation
+            #for k in self.qvalues.keys():
+            #    print(k, list(zip(actions,self.qvalues[k])))
+            #print('----------------------------')
             i += 1
             if i % 1000 == 0:
                 print(i, "episodes complete") 
@@ -247,7 +251,7 @@ class RBAgent(QLearner):
                 for dfa in self.dfas:
                     total_obs = total_obs + (dfa.state, )
                 action = self.policy(total_obs)
-                self.logger.record_state_g(observation, action, self.qvalues[total_obs])
+                self.logger.record_state_g(observation, action, list(zip(actions,self.qvalues[total_obs])))
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
                 episode_over = terminated or truncated
                 observation = next_observation

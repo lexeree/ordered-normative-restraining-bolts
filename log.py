@@ -54,7 +54,7 @@ class Log:
 
     def record_state_g(self, state, action, qs):
         tr = {}
-        tr['X'] = state[0]
+        tr['X'] = str(state[0])
         tr['Y'] = state[1]
         tr['QVals'] = qs
         tr['Action'] = action
