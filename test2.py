@@ -4,7 +4,7 @@ import qlLTL as rb
 import epsilon_decay as rbd
 from automaton import DFA
 import argparse
-from merchant import MerchantEnv
+from merchant import MerchantEnv, labels, actions
 from agents import QLearner, RBAgent, ONRBAgent1, ONRBAgent2
 from dfas.dfas import DangerDFA, PassiveDFA, DeliveryDFA
 import pickle
