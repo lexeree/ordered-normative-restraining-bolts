@@ -46,19 +46,24 @@ class DangerDFA(DFA):
 class PassiveDFA(DFA):
     def __init__(self, reward=0):
         super().__init__(-reward, reset="punctual", permission=False)
-        self.states = [0, 1]
-        self.final = [1]
+        self.states = [0, 1, 2]
+        self.final = [2]
 
     def transition(self, inpt, state=None):
         if state is None:
             state = self.state
         if state == 0:
-            if "atDanger" in inpt and "unload" not in inpt:
+            if "atDanger" in inpt:
                 return 1
             else:
                 return 0
         if state == 1:
-            return 1
+            if "fight" in inpt:
+                return 2
+            elif "atDanger" in inpt:
+                return 1
+            else:
+                return 0
 
 
 class EnvFriendlyDFA(DFA):

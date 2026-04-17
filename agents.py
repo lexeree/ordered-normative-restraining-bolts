@@ -136,13 +136,14 @@ class RandomAgent(Agent):
     
 
 class QLearner():
-    def __init__(self, env, eval_env=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
+    def __init__(self, env, eval_env=None, ntrain=10000, gamma=0.9, alpha=0.5, epsilon=0.15):
         self.env = TimeLimit(env, 35)
         self.eval_env = eval_env
         self.ntrain = ntrain
         self.gamma = gamma
         self.alpha = alpha
         self.epsilon = epsilon
+        self.cur_epsilon = epsilon
         self.logger = log.Log("QLearner")
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n))     
 
@@ -152,16 +153,16 @@ class QLearner():
         #print("Future q val: ", future_q_value)
         temporal_difference = reward + self.gamma * future_q_value - self.qvalues[state][action]
         #print("Temporal difference: ", temporal_difference)
-        self.qvalues[state][action] = self.qvalues[state][action] + self.alpha * temporal_difference
-        #print("New q val ", state, ", ", action, ": ", self.qvalues[state][action])
+        self.qvalues[state][action] = self.alpha * temporal_difference + self.qvalues[state][action]
 
-    def policy(self, state, egreedy=False):
+    def policy(self, state, egreedy=0):
         acts = self.env.unwrapped.exclActions()
-        if egreedy and random.random() < self.epsilon:
+        if random.random() < egreedy:
             action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
         else:
             opts = self.qvalues[state]
             filtered = np.array([-1*np.inf if a in acts else opts[a] for a in range(self.env.action_space.n)])
+            #print(state, ": ", filtered)
             action = int(np.argmax(filtered))
         return action
 
@@ -171,13 +172,14 @@ class QLearner():
             observation, info = self.env.reset()
             episode_over = False
             while not episode_over:
-                action = self.policy(observation, egreedy=True)
+                action = self.policy(observation, egreedy=self.cur_epsilon)
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
                 self.update(observation, action, next_observation, reward, terminated)
                 episode_over = terminated or truncated
                 observation = next_observation
             i += 1
-            if i % 1000 == 0:
+            if i % 10000 == 0:
+                self.cur_epsilon = 0.5*self.cur_epsilon
                 print(i, "episodes complete") 
         if save is not None:
             with open(fname+'.p', 'bw') as f:
@@ -206,7 +208,7 @@ class QLearner():
 class RBAgent(QLearner):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
         QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = SimpleMerchantRBWrapper(TimeLimit(env, 50), dfa_list) 
+        self.env = SimpleMerchantRBWrapper(TimeLimit(env, 35), dfa_list) 
         self.name = 'Restraining Bolt Agent'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -221,7 +223,7 @@ class RBAgent(QLearner):
                 total_obs = (observation, )
                 for dfa in self.dfas:
                     total_obs = total_obs + (dfa.state, )
-                action = self.policy(total_obs, egreedy=True)
+                action = self.policy(total_obs, egreedy=self.cur_epsilon)
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
                 n_total_obs = (next_observation, )
                 for dfa in self.dfas:
@@ -234,7 +236,8 @@ class RBAgent(QLearner):
             #    print(k, list(zip(actions,self.qvalues[k])))
             #print('----------------------------')
             i += 1
-            if i % 1000 == 0:
+            if i % 10000 == 0:
+                self.cur_epsilon = 0.8*self.cur_epsilon
                 print(i, "episodes complete") 
         if save is not None:
             with open(fname+'.p', 'bw') as f:
@@ -261,22 +264,25 @@ class RBAgent(QLearner):
             print(i, " episodes complete")
         self.env.close()
         return evaluation
+    
 
 
-class ONRBAgent1(QLearner):
+class ONRBAgent1(RBAgent):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
-        QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = MOMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
+        RBAgent.__init__(self, env, eval_env, dfa_list, ntrain, gamma, alpha, epsilon)
+        self.env = MOMerchantRBWrapper(TimeLimit(env, 35), dfa_list)
         self.name = 'ONRB Agent (scalarization)'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
         self.dfas = dfa_list if not None else []
-        self.allQValues = [self.qvalues]
-        self.weights = [1]
+        self.allQValues = []
+        self.weights = []
         for a in self.dfas:
             aqvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
             self.allQValues.append(aqvalues)
-            self.weights.append(a.reward)
+            self.weights.append(-1*a.reward)
+        self.allQValues.append(self.qvalues)
+        self.weights.append(1)
 
     def getQValueVector(self, state, action):
         vec = []
@@ -287,26 +293,34 @@ class ONRBAgent1(QLearner):
     def computeValueVector(self, state):
         excls = self.env.unwrapped.exclActions()
         possible = [a for a in range(self.env.action_space.n) if a not in excls]
-        vals = [float('-inf')]*len(self.allQValues)
+        scalar = -1*np.inf
+        vals = []
         for a in possible:
             qs = self.getQValueVector(state, a)
-            for i in range(len(vals)):
-                if qs[i] > vals[i]:
-                    vals[i] = qs[i]
-        return np.array(vals)
+            sc = 0
+            for i in range(len(qs)):
+                sc += qs[i]*self.weights[i]
+            if sc > scalar:
+                vals = qs
+        return vals
     
     def update(self, state, action, nextState, reward, terminated):
         future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
+        #if reward[2] == 50:
+        #    print("Future Q:", future_q_values)
+        #    print("Reward: ", reward)
         temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
+        #if reward[2] == 50:
+        #    print("TD:", temporal_difference)
         for i in range(len(self.allQValues)):
-            self.allQValues[i][state][action] += self.alpha * temporal_difference[i]
+            self.allQValues[i][state][action] = self.alpha * temporal_difference[i] + self.allQValues[i][state][action]
+            #print("Qs new:", i,":", self.allQValues[i][state][action])
 
-    def policy(self, state, egreedy=False):
+    def policy(self, state, egreedy=0):
         acts = self.env.unwrapped.exclActions()
-        if egreedy and random.random() < self.epsilon:
+        if random.random() < egreedy:
             action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
         else:
-            excls = self.env.unwrapped.exclActions()
             values = []
             for a in range(self.env.action_space.n):
                 qvec = self.getQValueVector(state, a)
@@ -314,15 +328,69 @@ class ONRBAgent1(QLearner):
                 for i in range(len(self.allQValues)):
                     total += qvec[i]*self.weights[i]
                     values.append(total)
-            filtered = np.array([-1*np.inf if a in excls else values[a] for a in range(self.env.action_space.n)])
+            filtered = np.array([-1*np.inf if a in acts else values[a] for a in range(self.env.action_space.n)])
             action = int(np.argmax(filtered))
         return action
-     
+    
+    def train(self, save=None):
+        fname = save if not None else 'qvals'
+        for i in range(self.ntrain):
+            observation, info = self.env.reset()
+            episode_over = False
+            while not episode_over:
+                total_obs = (observation, )
+                for dfa in self.dfas:
+                    total_obs = total_obs + (dfa.state, )
+                action = self.policy(total_obs, egreedy=self.cur_epsilon)
+                next_observation, reward, terminated, truncated, info = self.env.step(action)
+                #if reward[2] == 50:
+                #    print(total_obs, ': ', action, "collected goods!")
+                #    print("old Qs: ", self.allQValues[2][total_obs])
+                n_total_obs = (next_observation, )
+                for dfa in self.dfas:
+                    n_total_obs = n_total_obs + (dfa.state, )
+                if i == self.ntrain - 1:
+                    print(total_obs, ': ', [self.allQValues[i][total_obs] for i in range(len(self.allQValues))])
+                self.update(total_obs, action, n_total_obs, reward, terminated)
+                #if reward[2] == 50:
+                #    print("new Qs: ", self.allQValues[2][total_obs])
+                episode_over = terminated or truncated
+                observation = next_observation
+            i += 1
+            if i % 10000 == 0:
+                self.cur_epsilon = 0.8*self.cur_epsilon
+                print(i, "episodes complete") 
+        if save is not None:
+            with open(fname+'.p', 'bw') as f:
+                qvals = dict(self.qvalues.copy())
+                pickle.dump(qvals, f)  
+    
+    def evaluate(self, runs=1, record=True):
+        evaluation = []
+        for i in range(runs):
+            observation, info = self.env.reset()
+            episode_over = False
+            while not episode_over:
+                total_obs = (observation, )
+                for dfa in self.dfas:
+                    total_obs = total_obs + (dfa.state, )
+                action = self.policy(total_obs)
+                self.logger.record_state_g(observation, action, [self.allQValues[i][total_obs] for i in range(len(self.allQValues))])
+                next_observation, reward, terminated, truncated, info = self.env.step(action)
+                episode_over = terminated or truncated
+                observation = next_observation
+                if episode_over and record:
+                    self.logger.export_trace_g()
+            i += 1
+            print(i, " episodes complete")
+        self.env.close()
+        return evaluation
+    
 
-class ONRBAgent1(QLearner):
+class ONRBAgent2(QLearner):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
         QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = MOMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
+        self.env = TimeLimit(MOMerchantRBWrapper(env, dfa_list), 35)
         self.name = 'ONRB Agent (scalarization)'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -359,6 +427,7 @@ class ONRBAgent1(QLearner):
             self.allQValues[i][state][action] += self.alpha * temporal_difference[i]
 
     def policy(self, state, egreedy=False):
+        acts = self.env.unwrapped.exclActions()
         if egreedy and random.random() < self.epsilon:
             action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
         else:

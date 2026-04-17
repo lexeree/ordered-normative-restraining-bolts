@@ -4,8 +4,8 @@ import qlLTL as rb
 import epsilon_decay as rbd
 from automaton import DFA
 import argparse
-from merchant import MerchantEnv, actions, labels
-from agents import QLearner, RBAgent
+from merchant import MerchantEnv
+from agents import QLearner, RBAgent, ONRBAgent1, ONRBAgent2
 from dfas.dfas import DangerDFA, PassiveDFA, DeliveryDFA
 import pickle
 import pandas as pd
@@ -22,13 +22,15 @@ def split_key(key):
 if __name__ == '__main__':
     env = MerchantEnv()
 
-    #a = QLearner(env, ntrain=500000, epsilon=0.25)
+    #a = QLearner(env, ntrain=100000, epsilon=0.3, gamma=0.99)
 
-    dfa1 = DeliveryDFA(1000.0)
-    dfa2 = DangerDFA(25.0)
-    dfa3 = PassiveDFA(200.0)
+    dfa1 = DeliveryDFA(500.0)
+    dfa2 = DangerDFA(50.0)
+    dfa3 = PassiveDFA(350.0)
 
-    a = RBAgent(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=200000, epsilon=0.3, alpha=1)
+    #a = RBAgent(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=200000, epsilon=0.5, gamma=0.999)
+
+    a = ONRBAgent1(env, dfa_list=[dfa1, dfa2], ntrain=500000, epsilon=0.5, gamma=0.999)
 
     a.train(save="radu_test")
     #init_state, _ = env.reset()

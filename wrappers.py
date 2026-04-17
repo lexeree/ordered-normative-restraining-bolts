@@ -35,16 +35,16 @@ class MOMerchantRBWrapper(SimpleMerchantRBWrapper):
         super().__init__(env, dfa_list)
         
     def step(self, action):
-        inpt = self.env.get_labels()
+        inpt = self.env.unwrapped.get_labels()
         observation, reward, terminated, truncated, info = self.env.step(action)
         rb = []
         for dfa in self.dfa_list:
             state = dfa.transition(inpt)
             if state in dfa.final:
-                rb.append(dfa.reward)
+                rb.append(-1.)
+                dfa.state = dfa.reset(dfa.state, state)
             else:
                 dfa.state = state
                 rb.append(0.0)
-            dfa.state = dfa.reset(dfa.state, state)
-        reward = np.array([reward] + rb)
-        return observation, reward, terminated, truncated, info
+        rew_vec = np.array(rb + [reward])
+        return observation, rew_vec, terminated, truncated, info
