@@ -282,7 +282,7 @@ class ONRBAgent1(RBAgent):
             self.allQValues.append(aqvalues)
             self.weights.append(-1*a.reward)
         self.allQValues.append(self.qvalues)
-        self.weights.append(1)
+        self.weights.append(1.0)
 
     def getQValueVector(self, state, action):
         vec = []
@@ -307,14 +307,15 @@ class ONRBAgent1(RBAgent):
     def update(self, state, action, nextState, reward, terminated):
         future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
         #if reward[2] == 50:
-        #    print("Future Q:", future_q_values)
-        #    print("Reward: ", reward)
+            #print("Future Q:", future_q_values)
+            #print("Reward: ", reward)
         temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
         #if reward[2] == 50:
-        #    print("TD:", temporal_difference)
+            #print("TD:", temporal_difference)
         for i in range(len(self.allQValues)):
             self.allQValues[i][state][action] = self.alpha * temporal_difference[i] + self.allQValues[i][state][action]
-            #print("Qs new:", i,":", self.allQValues[i][state][action])
+            #if reward[2] == 50:
+                #print("Qs new:", i,":", self.allQValues[i][state][action])
 
     def policy(self, state, egreedy=0):
         acts = self.env.unwrapped.exclActions()
@@ -329,6 +330,8 @@ class ONRBAgent1(RBAgent):
                     total += qvec[i]*self.weights[i]
                 values.append(total)
             filtered = np.array([-1*np.inf if a in acts else values[a] for a in range(self.env.action_space.n)])
+            if egreedy == 0:
+                print(state, ': ', filtered)
             action = int(np.argmax(filtered))
         return action
     
@@ -349,8 +352,8 @@ class ONRBAgent1(RBAgent):
                 n_total_obs = (next_observation, )
                 for dfa in self.dfas:
                     n_total_obs = n_total_obs + (dfa.state, )
-                if i == self.ntrain - 1:
-                    print(total_obs, ': ', [self.allQValues[i][total_obs] for i in range(len(self.allQValues))])
+                #if i == self.ntrain - 1:
+                #    print(total_obs, ': ', [self.allQValues[i][total_obs] for i in range(len(self.allQValues))])
                 self.update(total_obs, action, n_total_obs, reward, terminated)
                 #if reward[2] == 50:
                 #    print("new Qs: ", self.allQValues[2][total_obs])

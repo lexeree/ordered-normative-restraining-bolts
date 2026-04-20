@@ -30,45 +30,45 @@ if __name__ == '__main__':
 
     #a = RBAgent(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=200000, epsilon=0.5, gamma=0.999)
 
-    a = ONRBAgent1(env, dfa_list=[dfa1, dfa2], ntrain=500000, epsilon=0.5, gamma=0.999)
+    a = ONRBAgent1(env, dfa_list=[dfa1, dfa2], ntrain=1000000, epsilon=0.1, gamma=0.999)
 
-    a.train(save="radu_test")
+    a.train(save="model1")
     #init_state, _ = env.reset()
     #init_state = (init_state, 0, 0, 0)
     #print(list(zip(actions, a.qvalues[init_state])))
     a.evaluate()
 
-    with open("radu_test.p", "rb") as f:
-        data = pickle.load(f)
+    #with open("radu_test.p", "rb") as f:
+    #    data = pickle.load(f)
 
-    df = pd.DataFrame.from_dict(data, orient="index")
+    #df = pd.DataFrame.from_dict(data, orient="index")
 
     # Move index (keys) into a column
-    df.reset_index(inplace=True)
+    #df.reset_index(inplace=True)
 
     # Rename column
-    df.rename(columns={"index": "id"}, inplace=True)
-    expanded = df["id"].apply(split_key).apply(pd.Series)
-    expanded = expanded.drop(expanded.columns[7:13], axis=1)
-    expanded = pd.concat(
-        [expanded, df.reset_index(drop=True).iloc[:, 1:]],
-        axis=1
-    )
-    expanded.columns = [
-        "x",
-        "y",
-        "label",
-        "wood_collected",
-        "ore_collected",
-        "sundown",
-        "last_action",
-        "aut_1",
-        "aut_2",
-        "aut_3",
-    ] + actions
-    expanded["last_action"] = expanded["last_action"].map(lambda x: "No act" if x == 7 else actions[x])
-    expanded["label"] = expanded["label"].map(lambda x: labels[x])
+    #df.rename(columns={"index": "id"}, inplace=True)
+    #expanded = df["id"].apply(split_key).apply(pd.Series)
+    #expanded = expanded.drop(expanded.columns[7:13], axis=1)
+    #expanded = pd.concat(
+    #    [expanded, df.reset_index(drop=True).iloc[:, 1:]],
+    #    axis=1
+    #)
+    #expanded.columns = [
+    #    "x",
+    #    "y",
+    #    "label",
+    #    "wood_collected",
+    #    "ore_collected",
+    #    "sundown",
+    #    "last_action",
+    #    "aut_1",
+    #    "aut_2",
+    #    "aut_3",
+    #] + actions
+    #expanded["last_action"] = expanded["last_action"].map(lambda x: "No act" if x == 7 else actions[x])
+    #expanded["label"] = expanded["label"].map(lambda x: labels[x])
     # Save to CSV
-    expanded.to_csv("output.csv", index=False)
+    #expanded.to_csv("output.csv", index=False)
 
  
