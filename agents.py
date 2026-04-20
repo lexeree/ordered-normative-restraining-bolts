@@ -327,7 +327,7 @@ class ONRBAgent1(RBAgent):
                 total = 0
                 for i in range(len(self.allQValues)):
                     total += qvec[i]*self.weights[i]
-                    values.append(total)
+                values.append(total)
             filtered = np.array([-1*np.inf if a in acts else values[a] for a in range(self.env.action_space.n)])
             action = int(np.argmax(filtered))
         return action
