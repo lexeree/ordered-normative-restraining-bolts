@@ -20,7 +20,7 @@ def split_key(key):
     return list(state) + [a, b, c]
 
 if __name__ == '__main__':
-    env = MerchantEnv()
+    env = MerchantEnv(layout="simplified")
 
     #a = QLearner(env, ntrain=100000, epsilon=0.3, gamma=0.99)
 
@@ -30,7 +30,11 @@ if __name__ == '__main__':
 
     #a = RBAgent(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=200000, epsilon=0.5, gamma=0.999)
 
-    a = ONRBAgent1(env, dfa_list=[dfa1, dfa2], ntrain=1000000, epsilon=0.1, gamma=0.999)
+    a = ONRBAgent1(env, dfa_list=[dfa1, dfa2], ntrain=500000, epsilon=0.1, alpha=0.1, gamma=0.999)
+
+    #a = ONRBAgent1(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=500000, epsilon=0.1, alpha=0.05, gamma=0.999)
+
+    #a = ONRBAgent2(env, dfa_list=[dfa1, dfa2], ntrain=1000000, epsilon=0.25, alpha=0.05, gamma=0.99)
 
     a.train(save="model1")
     #init_state, _ = env.reset()

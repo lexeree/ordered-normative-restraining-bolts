@@ -297,7 +297,7 @@ class ONRBAgent1(RBAgent):
         vals = []
         for a in possible:
             qs = self.getQValueVector(state, a)
-            sc = 0
+            sc = 0.0
             for i in range(len(qs)):
                 sc += qs[i]*self.weights[i]
             if sc > scalar:
@@ -325,7 +325,7 @@ class ONRBAgent1(RBAgent):
             values = []
             for a in range(self.env.action_space.n):
                 qvec = self.getQValueVector(state, a)
-                total = 0
+                total = 0.0
                 for i in range(len(self.allQValues)):
                     total += qvec[i]*self.weights[i]
                 values.append(total)
@@ -390,67 +390,10 @@ class ONRBAgent1(RBAgent):
         return evaluation
     
 
-class ONRBAgent2(QLearner):
+class ONRBAgent2(ONRBAgent1):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
-        QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = TimeLimit(MOMerchantRBWrapper(env, dfa_list), 35)
-        self.name = 'ONRB Agent (scalarization)'
-        self.logger = log.Log(self.name)
-        self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
-        self.dfas = dfa_list if not None else []
-        self.allQValues = []
-        self.weights = [1]
-        for a in self.dfas:
-            aqvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
-            self.allQValues.append(aqvalues)
-            self.weights.append(a.reward)
-        self.allQValues += [self.qvalues]
-
-    def getQValueVector(self, state, action):
-        vec = []
-        for q in self.allQValues:
-            vec.append(q[state][action])
-        return np.array(vec)
-
-    def computeValueVector(self, state):
-        excls = self.env.unwrapped.exclActions()
-        possible = [a for a in range(self.env.action_space.n) if a not in excls]
-        vals = [float('-inf')]*len(self.allQValues)
-        for a in possible:
-            qs = self.getQValueVector(state, a)
-            for i in range(len(vals)):
-                if qs[i] > vals[i]:
-                    vals[i] = qs[i]
-        return np.array(vals)
-    
-    def update(self, state, action, nextState, reward, terminated):
-        future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
-        temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
-        for i in range(len(self.allQValues)):
-            self.allQValues[i][state][action] += self.alpha * temporal_difference[i]
-
-    def policy(self, state, egreedy=False):
-        acts = self.env.unwrapped.exclActions()
-        if egreedy and random.random() < self.epsilon:
-            action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
-        else:
-            excls = self.env.unwrapped.exclActions()
-            values = []
-            for a in range(self.env.action_space.n):
-                qvec = self.getQValueVector(state, a)
-                total = 0
-                for i in range(len(self.allQValues)):
-                    total += qvec[i]*self.weights[i]
-                    values.append(total)
-            filtered = np.array([-1*np.inf if a in excls else values[a] for a in range(self.env.action_space.n)])
-            action = int(np.argmax(filtered))
-        return action
-
-
-class ONRBAgent2(QLearner):
-    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
-        QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = MOMerchantRBWrapper(TimeLimit(env, 50), dfa_list)
+        ONRBAgent1.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
+        self.env = MOMerchantRBWrapper(TimeLimit(env, 35), dfa_list)
         self.name = 'ONRB Agent (TLQL)'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -459,30 +402,18 @@ class ONRBAgent2(QLearner):
         for a in self.dfas:
             aqvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
             self.allQValues.append(aqvalues)
-        self.allQValues += [self.qvalues]
-
-    def getQValueVector(self, state, action):
-        vec = []
-        for q in self.allQValues:
-            vec.append(q[state][action])
-        return np.array(vec)
+        self.allQValues.append(self.qvalues)
 
     def computeValueVector(self, state):
         excls = self.env.unwrapped.exclActions()
-        possible = [a for a in range(self.env.action_space.n) if a not in excls]
-        vals = [float('-inf')]*len(self.allQValues)
-        for a in possible:
-            qs = self.getQValueVector(state, a)
-            for i in range(len(vals)):
-                if qs[i] > vals[i]:
-                    vals[i] = qs[i]
-        return np.array(vals)
-    
-    def update(self, state, action, nextState, reward, terminated):
-        future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
-        temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
-        for i in range(len(self.allQValues)):
-            self.allQValues[i][state][action] += self.alpha * temporal_difference[i]
+        selected = [a for a in range(self.env.action_space.n) if a not in excls]
+        for q in self.allQValues:
+            opts = q[state]
+            filtered = np.array([-1*np.inf if a not in selected else opts[a] for a in range(self.env.action_space.n)])
+            s = [a for a in selected if filtered[a] >= np.max(filtered)]
+            selected = s
+        val = selected[0]
+        return val
 
     def policy(self, state, egreedy=False):
         acts = self.env.unwrapped.exclActions()
@@ -490,12 +421,11 @@ class ONRBAgent2(QLearner):
             action = random.choice([a for a in range(self.env.action_space.n) if a not in acts])
         else:
             excls = self.env.unwrapped.exclActions()
-            possible = [a for a in range(self.env.action_space.n) if a not in excls]
-            vvec = self.computeValueVector(state)
-            for i in len(vvec):
-                newpos = []
-                for a in possible:
-                    if self.allQValues[i][state][a] >= vvec[i]:
-                        newpos.append(a)
-                possible = newpos
-        return random.choice(possible)
+            selected = [a for a in range(self.env.action_space.n) if a not in excls]
+            for q in self.allQValues:
+                opts = q[state]
+                filtered = np.array([-1*np.inf if a not in selected else opts[a] for a in range(self.env.action_space.n)])
+                s = [a for a in selected if filtered[a] >= np.max(filtered)]
+                selected = s
+            action = random.choice(selected)
+        return action
