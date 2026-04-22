@@ -306,13 +306,16 @@ class ONRBAgent1(RBAgent):
     
     def update(self, state, action, nextState, reward, terminated):
         future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
-        #print("Future Q:", future_q_values)
-        #print("Reward: ", reward)
+        #if state[0][2] in [3, 4]:
+        #    print("Future Q:", future_q_values)
+        #    print("Reward: ", reward)
         temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
-        #print("TD:", temporal_difference)
+        #if state[0][2] in [3, 4]:
+        #    print("TD:", temporal_difference)
         for i in range(len(self.allQValues)):
             self.allQValues[i][state][action] = self.alpha * temporal_difference[i] + self.allQValues[i][state][action]
-            #print("Qs new:", i,":", self.allQValues[i][state][action])
+            #if state[0][2] in [3, 4]:
+            #    print("Qs new:", i,":", self.allQValues[i][state][action])
 
     def policy(self, state, egreedy=0):
         acts = self.env.unwrapped.exclActions()
@@ -406,7 +409,7 @@ class ONRBAgent2(ONRBAgent1):
         for q in self.allQValues:
             opts = q[state]
             filtered = np.array([-1*np.inf if a not in selected else opts[a] for a in range(self.env.action_space.n)])
-            s = [a for a in selected if filtered[a] >= np.max(filtered)-0.002]
+            s = [a for a in selected if filtered[a] >= np.max(filtered)-0.01]
             selected = s
         return self.getQValueVector(state, selected[0])
 
@@ -420,7 +423,7 @@ class ONRBAgent2(ONRBAgent1):
             for q in self.allQValues:
                 opts = q[state]
                 filtered = np.array([-1*np.inf if a not in selected else opts[a] for a in range(self.env.action_space.n)])
-                s = [a for a in selected if filtered[a] >= np.max(filtered)-0.002]
+                s = [a for a in selected if filtered[a] >= np.max(filtered)-0.01]
                 selected = s
             action = random.choice(selected)
         return action

@@ -25,16 +25,21 @@ if __name__ == '__main__':
     #a = QLearner(env, ntrain=100000, epsilon=0.3, gamma=0.99)
 
     dfa1 = DeliveryDFA(500.0)
-    dfa2 = DangerDFA(50.0)
-    dfa3 = PassiveDFA(350.0)
+    dfa2 = PassiveDFA(350.0)
+    dfa3 = DangerDFA(50.0)
+    
 
     #a = RBAgent(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=200000, epsilon=0.5, gamma=0.999)
 
-    #a = ONRBAgent1(env, dfa_list=[dfa1, dfa2], ntrain=500000, epsilon=0.1, alpha=0.1, gamma=0.999)
+    #a = ONRBAgent1(env, dfa_list=[dfa1, dfa3], ntrain=500000, epsilon=0.1, alpha=0.1, gamma=0.999)
 
     #a = ONRBAgent1(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=500000, epsilon=0.1, alpha=0.1, gamma=0.999)
 
-    a = ONRBAgent2(env, dfa_list=[dfa1, dfa2], ntrain=500000, epsilon=0.1, alpha=0.1, gamma=0.999)
+    #a = ONRBAgent2(env, dfa_list=[dfa1, dfa3], ntrain=500000, epsilon=0.1, alpha=0.1, gamma=0.999)
+
+    #TODO: test with more episodes
+
+    a = ONRBAgent2(env, dfa_list=[dfa1, dfa2, dfa3], ntrain=750000, epsilon=0.1, alpha=0.1, gamma=0.999)
 
     a.train(save="model1")
     #init_state, _ = env.reset()
