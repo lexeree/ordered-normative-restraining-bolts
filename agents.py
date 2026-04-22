@@ -292,30 +292,27 @@ class ONRBAgent1(RBAgent):
 
     def computeValueVector(self, state):
         excls = self.env.unwrapped.exclActions()
-        possible = [a for a in range(self.env.action_space.n) if a not in excls]
-        scalar = -1*np.inf
-        vals = []
-        for a in possible:
-            qs = self.getQValueVector(state, a)
-            sc = 0.0
-            for i in range(len(qs)):
-                sc += qs[i]*self.weights[i]
-            if sc > scalar:
-                vals = qs
-        return vals
+        values = []
+        for a in range(self.env.action_space.n):
+            qvec = self.getQValueVector(state, a)
+            total = 0.0
+            for i in range(len(self.allQValues)):
+                total += qvec[i]*self.weights[i]
+            values.append(total)
+        filtered = np.array([-1*np.inf if a in excls else values[a] for a in range(self.env.action_space.n)])
+        action = int(np.argmax(filtered))
+        return self.getQValueVector(state, action)
+
     
     def update(self, state, action, nextState, reward, terminated):
         future_q_values = np.zeros(len(self.allQValues)) if terminated else self.computeValueVector(nextState)
-        #if reward[2] == 50:
-            #print("Future Q:", future_q_values)
-            #print("Reward: ", reward)
+        #print("Future Q:", future_q_values)
+        #print("Reward: ", reward)
         temporal_difference = reward + self.gamma * future_q_values - self.getQValueVector(state, action)
-        #if reward[2] == 50:
-            #print("TD:", temporal_difference)
+        #print("TD:", temporal_difference)
         for i in range(len(self.allQValues)):
             self.allQValues[i][state][action] = self.alpha * temporal_difference[i] + self.allQValues[i][state][action]
-            #if reward[2] == 50:
-                #print("Qs new:", i,":", self.allQValues[i][state][action])
+            #print("Qs new:", i,":", self.allQValues[i][state][action])
 
     def policy(self, state, egreedy=0):
         acts = self.env.unwrapped.exclActions()
@@ -392,12 +389,11 @@ class ONRBAgent1(RBAgent):
 
 class ONRBAgent2(ONRBAgent1):
     def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
-        ONRBAgent1.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
+        ONRBAgent1.__init__(self, env, eval_env, dfa_list, ntrain, gamma, alpha, epsilon)
         self.env = MOMerchantRBWrapper(TimeLimit(env, 35), dfa_list)
         self.name = 'ONRB Agent (TLQL)'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
-        self.dfas = dfa_list if not None else []
         self.allQValues = []
         for a in self.dfas:
             aqvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -410,10 +406,9 @@ class ONRBAgent2(ONRBAgent1):
         for q in self.allQValues:
             opts = q[state]
             filtered = np.array([-1*np.inf if a not in selected else opts[a] for a in range(self.env.action_space.n)])
-            s = [a for a in selected if filtered[a] >= np.max(filtered)]
+            s = [a for a in selected if filtered[a] >= np.max(filtered)-0.002]
             selected = s
-        val = selected[0]
-        return val
+        return self.getQValueVector(state, selected[0])
 
     def policy(self, state, egreedy=False):
         acts = self.env.unwrapped.exclActions()
@@ -425,7 +420,7 @@ class ONRBAgent2(ONRBAgent1):
             for q in self.allQValues:
                 opts = q[state]
                 filtered = np.array([-1*np.inf if a not in selected else opts[a] for a in range(self.env.action_space.n)])
-                s = [a for a in selected if filtered[a] >= np.max(filtered)]
+                s = [a for a in selected if filtered[a] >= np.max(filtered)-0.002]
                 selected = s
             action = random.choice(selected)
         return action
