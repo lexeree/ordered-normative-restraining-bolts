@@ -1,0 +1,8 @@
+Scenario normchange
+-------------------------------
+Best Parameteters:
+ntrain 1000000 
+epsilon 0.3182 
+alpha 0.2243 
+gamma 0.9844 
+max-episode-steps 175

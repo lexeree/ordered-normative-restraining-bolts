@@ -136,8 +136,8 @@ class RandomAgent(Agent):
     
 
 class QLearner():
-    def __init__(self, env, eval_env=None, ntrain=10000, gamma=0.9, alpha=0.5, epsilon=0.15):
-        self.env = TimeLimit(env, 35)
+    def __init__(self, env, eval_env=None, ntrain=10000, gamma=0.9, alpha=0.5, epsilon=0.15, max_episode_steps=50):
+        self.env = TimeLimit(env, max_episode_steps)
         self.eval_env = eval_env
         self.ntrain = ntrain
         self.gamma = gamma
@@ -188,17 +188,23 @@ class QLearner():
 
     def evaluate(self, runs=1, record=True):
         evaluation = []
+
         for i in range(runs):
             observation, info = self.env.reset()
             episode_over = False
+            total_reward = 0.0
+
             while not episode_over:
                 action = self.policy(observation)
-                self.logger.record_state_g(observation, action, self.qvalues[observation])
+                self.logger.record_state_g(observation, action, list(zip(actions,self.qvalues[observation])))
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
                 episode_over = terminated or truncated
                 observation = next_observation
+
+                total_reward += reward
                 if episode_over and record:
                     self.logger.export_trace_g()
+            evaluation.append(total_reward)
             i += 1
             print(i, " episodes complete")
         self.env.close()
@@ -206,9 +212,9 @@ class QLearner():
     
 
 class RBAgent(QLearner):
-    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
+    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15, max_episodes_steps=50):
         QLearner.__init__(self, env, eval_env, ntrain, gamma, alpha, epsilon)
-        self.env = SimpleMerchantRBWrapper(TimeLimit(env, 35), dfa_list) 
+        self.env = SimpleMerchantRBWrapper(TimeLimit(env, max_episodes_steps), dfa_list)
         self.name = 'Restraining Bolt Agent'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -268,9 +274,9 @@ class RBAgent(QLearner):
 
 
 class ONRBAgent1(RBAgent):
-    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
+    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15, max_episodes_steps=50):
         RBAgent.__init__(self, env, eval_env, dfa_list, ntrain, gamma, alpha, epsilon)
-        self.env = MOMerchantRBWrapper(TimeLimit(env, 35), dfa_list)
+        self.env = MOMerchantRBWrapper(TimeLimit(env, max_episodes_steps), dfa_list)
         self.name = 'ONRB Agent (scalarization)'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 
@@ -391,9 +397,9 @@ class ONRBAgent1(RBAgent):
     
 
 class ONRBAgent2(ONRBAgent1):
-    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15):
+    def __init__(self, env, eval_env=None, dfa_list=None, ntrain=10000, gamma=0.9, alpha=0.2, epsilon=0.15, max_episodes_steps=50):
         ONRBAgent1.__init__(self, env, eval_env, dfa_list, ntrain, gamma, alpha, epsilon)
-        self.env = MOMerchantRBWrapper(TimeLimit(env, 35), dfa_list)
+        self.env = MOMerchantRBWrapper(TimeLimit(env, max_episodes_steps), dfa_list)
         self.name = 'ONRB Agent (TLQL)'
         self.logger = log.Log(self.name)
         self.qvalues = defaultdict(lambda: np.zeros(self.env.action_space.n)) 

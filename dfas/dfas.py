@@ -114,6 +114,79 @@ class DeliveryDFA(DFA):
         if state == 2:
             return 2
 
+# O^A_hasWood(hasOre)
+# !hasOre U has_wood
+class OreAfterTreeDFA(DFA):
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="achievement", permission=False)
+        self.states = [0, 1, 2]
+        self.final = [1]
+
+    def transition(self, inpt, state=None):
+        if state is None:
+            state = self.state
+        if state == 0:
+            if "hasOre" in inpt and "hasWood" not in inpt:
+                return 2
+            elif "hasWood" in inpt:
+                return 1
+            else:
+                return 0
+        if state == 1:
+            return 1
+        if state == 2:
+            return 2
+
+class NoExtractOreDFA(DFA):
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="punctual", permission=False)
+        self.states = [0, 1]
+        self.final = [1]
+
+    def transition(self, inpt, state=None):
+        if state is None:
+            state = self.state
+        if state == 0:
+            if "atRock" in inpt and "extract" in inpt:
+                return 1
+            else:
+                return 0
+        if state == 1:
+            return 1
+
+class NoExtractWoodDFA(DFA):
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="punctual", permission=False)
+        self.states = [0, 1]
+        self.final = [1]
+
+    def transition(self, inpt, state=None):
+        if state is None:
+            state = self.state
+        if state == 0:
+            if "atWood" in inpt and "extract" in inpt:
+                return 1
+            else:
+                return 0
+        if state == 1:
+            return 1
+
+class NoExtractWoodIfAlreadyExtractedDFA(DFA):
+    def __init__(self, reward=0):
+        super().__init__(-reward, reset="punctual", permission=False)
+        self.states = [0, 1]
+        self.final = [1]
+
+    def transition(self, inpt, state=None):
+        if state is None:
+            state = self.state
+        if state == 0:
+            if "atTree" in inpt and "extract" in inpt and "hasWood" in inpt:
+                return 1
+            else:
+                return 0
+        if state == 1:
+            return 1
 
 # TODO: permission DFAs
 class EnvPerm(DFA):
@@ -127,6 +200,25 @@ class EnvPerm(DFA):
             state = self.state
         if state == 0:
             if "atTree" in inpt and "extract" in inpt and "hasWood" not in inpt:
+                return 1
+            else:
+                return 0
+        if state == 1:
+            return 1
+
+
+class ExtractRockPermDFA(DFA):
+    def __init__(self, reward=0):
+        super().__init__(reward, reset="punctual", permission=True)
+        self.states = [0, 1]
+        self.final = [1]
+
+
+    def transition(self, inpt, state=None):
+        if state is None:
+            state = self.state
+        if state == 0:
+            if "atRock" in inpt and "extract" in inpt:
                 return 1
             else:
                 return 0
