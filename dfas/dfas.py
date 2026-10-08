@@ -1,7 +1,3 @@
-
-
-#TODO: add threshold parameter to DFA class
-
 class DFA:
     def __init__(self, reward=0.0, reset="punctual", permission=False):
         self.state0 = 0
