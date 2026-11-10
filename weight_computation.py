@@ -1,7 +1,7 @@
 import numpy as np
 #import pandas as pd
 from mip import Model, xsum, maximize, minimize
-from CHVI_new import convex_hull_value_iteration
+from CHVI import convex_hull_value_iteration
 from agents import Agent
 from automaton import DFA
 from environment import Environment
@@ -135,7 +135,7 @@ def get_weights(env, automata, epsilon, dist=False, discount_factor=1.0, max_ite
     hull = convex_hull_value_iteration(env, automata, dist, discount_factor, max_iterations)
 
     # get the initial states (in our case just one)
-    initial_states = [tuple([env.initialState()] + [x.state0 for x in automata])]
+    initial_states = [tuple([env.reset()[0]] + [x.state0 for x in automata])]
 
     # compute the ethical weights
     ethical_weight = ethical_embedding_start_state(hull, priority, initial_states, epsilon)

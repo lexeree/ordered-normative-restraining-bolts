@@ -155,6 +155,10 @@ class MerchantEnv(Env):
         self.state_or_final = self.__obs()
         # also remembers the current reward
         self.reward = reward
+
+        # penalize additional unnecessary movements
+        self.reward = self.reward - 1
+
         # if the new state is terminal resets the environment
         if terminal:
             self.reset()

@@ -1,15 +1,11 @@
 import numpy as np
-
+from dfas.dfas import NoExtractWoodIfAlreadyExtractedDFA
 import convexhull
-from agents import Agent
-from dfas.dfas import DangerDFA
 from merchant import MerchantEnv, decode_action, decode_state
-import copy
 from tqdm import tqdm
 
 
 def create_state_dict(env, automata, dist):
-    ag = Agent(env, dist)
     dict_list = []
     s, _ = env.reset()
     initial_state = (s,)
@@ -19,21 +15,30 @@ def create_state_dict(env, automata, dist):
     for i in range(0, len(automata)):
         initial_state = initial_state + (automata[i].state0,)
 
+    # iterative search with a set for the visited check (a list lookup is O(n) and recursion overflows the stack)
+    visited = {initial_state}
     dict_list.append((initial_state, []))
-    add_next_state(initial_state, env, ag, automata, dict_list, 0, False, pbar)
+    stack = [initial_state]
+
+    while stack:
+        state = stack.pop()
+        pbar.update(1)
+        for nstate in next_states(state, env, automata):
+            if nstate not in visited:
+                visited.add(nstate)
+                dict_list.append((nstate, []))
+                stack.append(nstate)
+
+    pbar.close()
     return dict_list
 
 
-def add_next_state(state, env, agent, automata, dict_list, depth, is_terminal, pbar):
-    pbar.update(1)
-
-    # stop the recursion if no action is possible or if the state is terminal
+def next_states(state, env, automata):
+    # the environment state is fully encoded in state[0], so resetting to it replaces a deepcopy of the env
+    env.reset(options={"state": state[0]})
     possible_actions = list(set(range(env.action_space.n)) - set(env.exclActions()))
-
-    if len(possible_actions) == 0 or is_terminal:
-        return
-
     curr_state_labels = env.get_labels().copy()
+    result = []
 
     for action in possible_actions:
         decoded_action = decode_action(action)
@@ -43,9 +48,13 @@ def add_next_state(state, env, agent, automata, dict_list, depth, is_terminal, p
                 decoded_action == 'south' or decoded_action == 'north' or decoded_action == 'west' or decoded_action == 'east'):
             continue
 
-        env_new = copy.deepcopy(env)
+        env.reset(options={"state": state[0]})
         inpt = list(set(curr_state_labels + [decoded_action]))
-        next_state, _, terminal, _, _ = env_new.step(action)
+        next_state, _, terminal, _, _ = env.step(action)
+
+        # terminal transitions have no successor state, their value is computed directly in the Q function
+        if terminal:
+            continue
 
         trans = tuple()
 
@@ -56,11 +65,9 @@ def add_next_state(state, env, agent, automata, dict_list, depth, is_terminal, p
             nst = automata[i].transition(inpt, astate)
             trans = trans + (nst,)
 
-        nstate = (next_state,) + trans
+        result.append((next_state,) + trans)
 
-        if (nstate, []) not in dict_list:
-            dict_list.append((nstate, []))
-            add_next_state(nstate, env_new, agent, automata, dict_list, depth + 1, terminal, pbar)
+    return result
 
 def convex_hull_value_iteration(env, automata, dist=False, discount_factor=1.0, max_iterations=5, model_used=None):
     """
@@ -84,6 +91,8 @@ def convex_hull_value_iteration(env, automata, dist=False, discount_factor=1.0, 
             pbar.update(1)
             dic[key] = Q_function_calculator(env, key, dic, automata, dist, discount_factor, model_used)
         iteration += 1
+
+        print(f"Discovered states: {len(dic)}")
     return dic
 
 def Q_function_calculator(env, state, V_state_dict, automata, dist=False, discount_factor=1.0, model_used=None):
@@ -107,6 +116,8 @@ def Q_function_calculator(env, state, V_state_dict, automata, dist=False, discou
         return []
 
     for action in possible_actions:
+        # reset before every action, so that a skipped action cannot leave the env in a wrong state
+        env.reset(options={"state": s})
         decoded_action = decode_action(action)
         curr_state_labels = env.get_labels().copy()
         curr_inpt = list(set(curr_state_labels + [decoded_action]))
@@ -128,45 +139,34 @@ def Q_function_calculator(env, state, V_state_dict, automata, dist=False, discou
             else:
                 rwds = rwds + (0,)
 
+        # a terminal action has no future value, but the other actions of this state still have to be considered
         if is_terminal:
-            return [list((reward_objective,) + rwds)]
+            hulls.append(np.array((reward_objective,) + rwds).astype(float))
+            continue
 
         sts = (next_state,) + curr_astates
-        try:
-            V_state = V_state_dict[sts].copy()
-        except:
+        if sts not in V_state_dict:
             continue
+        V_state = V_state_dict[sts].copy()
         hull_sa = convexhull.translate_hull(np.array((reward_objective,) + rwds).astype(float), discount_factor,
                                             V_state)
         for point in hull_sa:
             hulls.append(point)
 
-        env.reset(options={"state": s})
+    if len(hulls) == 0:
+        return []
 
     hulls = np.unique(np.array(hulls), axis=0)
     new_hull = convexhull.get_hull(hulls)
     return new_hull
 
-if __name__ == '__main__':
-    env = MerchantEnv(layout="test", sunset=0)
+if __name__ == "__main__":
 
-    # viol: F(at_danger)
-    def trans0a(l):
-        if 'at_danger' in l:
-            return 1
-        else:
-            return 0
+    env = MerchantEnv(layout="normchange", sunset=0)
 
+    dfa = NoExtractWoodIfAlreadyExtractedDFA(reward=1)
 
-    def trans1a(l):
-        return 1
-
-
-    transa = {}
-    transa[0] = trans0a
-    transa[1] = trans1a
-    automatona = DangerDFA(dict(labels=['atDanger']), 1)
-    hull = convex_hull_value_iteration(env, [automatona], False, 1, 25)
+    hull = convex_hull_value_iteration(env=env,automata=[dfa],dist=False,discount_factor=0.99,max_iterations=25)
 
     for k in hull.keys():
         if k[0][6] == 7:
