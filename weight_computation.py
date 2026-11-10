@@ -1,7 +1,7 @@
 import numpy as np
 #import pandas as pd
 from mip import Model, xsum, maximize, minimize
-from CHVI import convex_hull_value_iteration
+from CHVI_new import convex_hull_value_iteration
 from agents import Agent
 from automaton import DFA
 from environment import Environment
