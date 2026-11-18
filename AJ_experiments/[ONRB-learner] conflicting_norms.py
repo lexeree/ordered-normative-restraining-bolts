@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from merchant import MerchantEnv
 from agents import ONRBAgent1
 from dfas.dfas import DeliveryDFA, DangerDFA

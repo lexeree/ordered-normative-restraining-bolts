@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from merchant import MerchantEnv
 from agents import ONRBAgent2
 from dfas.dfas import DeliveryDFA, DangerDFA
@@ -12,7 +16,9 @@ def tune_optuna(
     epsilon: float,
     training_steps : int,
     ep_length: int
-) -> tuple[float,float]:
+) -> tuple[np.ndarray, np.ndarray]:
+    """Returns per-component (mean, std) across seeds.
+    Components: [-delivery_violations, -danger_violations, env_reward], all to be maximized."""
 
     seed_scores = []
 
@@ -28,11 +34,12 @@ def tune_optuna(
                        max_episodes_steps=ep_length)
         a.train()
 
-        rewards = a.evaluate(runs=20)
+        rewards = np.asarray(a.evaluate(runs=20, record=False))  # shape (runs, n_components)
 
-        seed_scores.append(np.mean(rewards))
+        seed_scores.append(rewards.mean(axis=0))  # per-component mean over runs
 
-    return float(np.mean(seed_scores)), float(np.std(seed_scores))
+    seed_scores = np.asarray(seed_scores)  # shape (n_seeds, n_components)
+    return seed_scores.mean(axis=0), seed_scores.std(axis=0)
 
 def run_optuna():
     opt = Optuna(train_test_func=tune_optuna)
@@ -43,7 +50,8 @@ def run_optuna():
                    gamma_interval=[0.90, 0.999],
                    epsilon_interval=[0.05, 0.4],
                    training_step_list=[100000],
-                   episode_length_list=[30, 32, 35]
+                   episode_length_list=[30, 32, 35],
+                   n_objectives=3
                    )
 
 def train_and_evaluate_tuned():

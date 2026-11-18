@@ -376,20 +376,29 @@ class ONRBAgent1(RBAgent):
     
     def evaluate(self, runs=1, record=True):
         evaluation = []
+
         for i in range(runs):
             observation, info = self.env.reset()
             episode_over = False
+            total_reward = 0.0
+
             while not episode_over:
                 total_obs = (observation, )
                 for dfa in self.dfas:
                     total_obs = total_obs + (dfa.state, )
                 action = self.policy(total_obs)
+
                 self.logger.record_state_g(observation, action, [self.allQValues[i][total_obs] for i in range(len(self.allQValues))])
                 next_observation, reward, terminated, truncated, info = self.env.step(action)
+
+                total_reward += reward
+
                 episode_over = terminated or truncated
                 observation = next_observation
+
                 if episode_over and record:
                     self.logger.export_trace_g()
+            evaluation.append(total_reward)
             i += 1
             print(i, " episodes complete")
         self.env.close()
