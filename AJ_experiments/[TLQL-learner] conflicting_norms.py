@@ -45,12 +45,12 @@ def run_optuna():
     opt = Optuna(train_test_func=tune_optuna)
     opt.run_optuna(db_name="[TLQL-learner] conflicting_norms",
                    scenario = "basic",
-                   trial=1,
-                   alpha_interval=[0.005, 0.3],
-                   gamma_interval=[0.90, 0.999],
-                   epsilon_interval=[0.05, 0.4],
-                   training_step_list=[100000],
-                   episode_length_list=[30, 32, 35],
+                   trial=2,
+                   alpha_interval = [0.005, 0.3],
+                   gamma_interval = [0.97, 0.999],
+                   epsilon_interval = [0.1, 0.5],
+                   training_step_list = [100000, 500000, 1000000],
+                   episode_length_list = [50, 75, 100],
                    n_objectives=3
                    )
 
@@ -62,9 +62,10 @@ def train_and_evaluate_tuned():
 
     dfa1 = DeliveryDFA(reward=1)
     dfa2 = DangerDFA(reward=1)
+    dfas= [dfa1, dfa2]
 
-    a = ONRBAgent2(env=env, dfa_list=[dfa1, dfa2], ntrain=100000, epsilon=0.25, alpha=0.1, gamma=0.9,
-                   max_episodes_steps=35)
+    a = ONRBAgent2(env=env, dfa_list=dfas, ntrain=100000, epsilon=0.2851, alpha=0.2127, gamma=0.9747,
+                   max_episodes_steps=30)
     a.train(save="[TLQL-learner] conflicting_norms")
     a.evaluate()
 
